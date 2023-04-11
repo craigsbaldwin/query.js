@@ -10,42 +10,61 @@
 /**
  * Query storefront API.
  * @param {Object} data - Parameters.
- * @param {String} [data.locale] - Locale code to load translated content.
  * @param {Object} data.query - GraphQL query.
  * @param {Object} data.variables - GraphQL variables.
  * @returns {Promise}
  */
- export default ({ locale, query: graphqlQuery, variables }) => {
-  const store = 'store_name'
-  const token = 'storefront_api_token'
-  const version = '2021-10'
+export default ({ query: graphqlQuery, variables }) => {
+  return new Promise(async(resolve, reject) => {
+    try {
+      const store = 'store_name'
+      const token = 'storefront_api_token'
+      const version = '2023-04'
+      const url = `https://${store}.myshopify.com/api/${version}/graphql.json`
 
-  const headers = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    'X-Shopify-Storefront-Access-Token': token,
-  }
+      /**
+       * Set headers.
+       */
+      const headers = {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Shopify-Storefront-Access-Token': token,
+      }
 
-  if (locale) {
-    headers['Accept-Language'] = locale.toLowerCase()
-  }
+      /**
+       * Add language header.
+       * - Also splits off language country as this isn't supported.
+       * - E.g. ZH-CN doesn't work, but ZH does.
+       */
+      if (variables?.language) {
+        const formattedLanguage = variables.language.toUpperCase().split('-')[0]
+        headers['Accept-Language'] = formattedLanguage
+        variables.language = formattedLanguage
+      }
 
-  return new Promise((resolve, reject) => {
-    fetch(`https://${store}.myshopify.com/api/${version}/graphql.json`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        query: buildQuery(graphqlQuery),
-        variables,
-      }),
-    })
-      .then((response) => response.json())
-      .then((response) => {
-        resolve(response.data)
+      /**
+       * Fetch response.
+       */
+      let response = await fetch(url, {
+        body: JSON.stringify({
+          query: buildQuery(graphqlQuery),
+          variables,
+        }),
+        headers,
+        method: 'POST',
       })
-      .catch((error) => {
-        reject(error)
-      })
+
+      if (!response.ok) {
+        reject(response.description)
+        return
+      }
+
+      response = await response.json()
+      resolve(response.data)
+
+    } catch (error) {
+      reject(error)
+    }
   })
 }
 
@@ -82,7 +101,16 @@ function buildQuery(astData) {
    * Replace fragment object with query.
    */
   Object.entries(fragments).forEach(([key, value]) => {
-    query = query.replace(`...${key}`, value)
+    let formattedValue = value
+
+    /**
+     * Resolves nested fragments.
+     */
+    Object.entries(fragments).forEach(([fragmentKey, fragmentValue]) => {
+      formattedValue = value.replace(`...${fragmentKey}`, fragmentValue)
+    })
+
+    query = query.replace(`...${key}`, formattedValue)
   })
 
   return query
@@ -97,15 +125,45 @@ function buildQuery(astData) {
 function buildFields(selections) {
   return selections.map((selection) => {
     let field = selection.alias
-      ? `${selection.alias.value}: ${selection.name.value}`
-      : selection.name.value
+      ? `${selection.alias?.value}: ${selection.name?.value}`
+      : selection.name?.value
+
+    /**
+     * Inline fragments.
+     */
+    if (selection.kind === 'InlineFragment') {
+      field = `... on ${selection.typeCondition.name.value}`
+    }
+
+    /**
+     * Preserves fragment syntax.
+     */
+    if (selection.kind === 'FragmentSpread') {
+      field = `...${selection.name.value}`
+    }
 
     /**
      * If field has argument append to variable.
      */
     if (selection.arguments?.length) {
       const args = selection.arguments.map((argument) => {
-        return `${argument.name.value}: ${argument.value.value}`
+        let value = argument.value.value
+
+        switch (argument.value.kind) {
+          case 'ListValue':
+            value = buildListArgumentValue(argument)
+            break
+
+          case 'StringValue':
+            value = `"${argument.value.value}"`
+            break
+
+          case 'Variable':
+            value = `$${argument.value.name.value}`
+            break
+        }
+
+        return `${argument.name.value}: ${value}`
       })
 
       field += `(${args.join(', ')})`
@@ -121,4 +179,21 @@ function buildFields(selections) {
 
     return field
   })
+}
+
+/**
+ * Builds value of argument when it's a list value (array of objects).
+ * @param {Object} argument - AST format argument object.
+ * @returns {String}
+ */
+function buildListArgumentValue(argument) {
+  const values = argument.value.values.map((value) => {
+    const fields = value.fields.map((field) => {
+      return `${field.name.value}: "${field.value.value}"`
+    })
+
+    return `{${fields.join(', ')}}`
+  })
+
+  return `[${values.join(', ')}]`
 }
