@@ -4,11 +4,11 @@ Super simple GraphQL query function for Shopify storefront API.
 ## About
 Query.js is a simple function that performs a GraphQL query without the extra bloat of dependencies like Apollo or urql, though they're recommended if you need more features (such as error handling or caching).
 
-It supports arguments, aliases, and nested fields in GraphQL fragments, but does not support passing query variables to the fragments.
+It supports arguments, aliases, nested fields and fragments, and variables in GraphQL fragments.
 
 ## Usage
 
-First update the `store`, `token`, and `version` variables in _query.js_. See [Shopify's documentation](https://shopify.dev/api/storefront) to see how you setup a private app with storefront API permissions.
+First update the `store`, `token`, and `version` variables in _query.js_. I recommend using the [_Headless_ sales channel](https://shopify.dev/docs/custom-storefronts/building-with-the-storefront-api/manage-headless-channels) to create a token with storefront API permissions.
 
 The below usage expects you to have a build tool setup to import and compile your GraphQL and JS files such as Webpack.
 
@@ -18,11 +18,11 @@ import Query from 'query'
 
 try {
   const response = await Query({
-    locale: 'en',
     query: product,
     variables: {
       country: 'GB',
       handle: 'product-handle',
+      locale: 'en',
     },
   })
 
