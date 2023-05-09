@@ -1,5 +1,9 @@
 # 📅 query.js Changelog
 
+## 2.1.0 - 2023-05-09
+
+* Improved support for language codes with two parts
+
 ## 2.0.0 - 2023-04-11
 
 * Added support for fragment variables, nested fragments, fragment spreads, and array variables
