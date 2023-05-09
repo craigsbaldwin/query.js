@@ -33,12 +33,14 @@ export default ({ query: graphqlQuery, variables }) => {
 
       /**
        * Add language header.
-       * - Also splits off language country as this isn't supported.
-       * - E.g. ZH-CN doesn't work, but ZH does.
+       * - Storefront API does not support kebab-case language code so this is
+       *   converted into SCREAMING_SNAKE_CASE.
+       * - E.g. ZH-CN doesn't work, but ZH_CH does.
+       * - Does not convert `Accept-Language` header as this expects kebab-case.
        */
       if (variables?.language) {
-        const formattedLanguage = variables.language.toUpperCase().split('-')[0]
-        headers['Accept-Language'] = formattedLanguage
+        headers['Accept-Language'] = variables.language
+        const formattedLanguage = variables.language.toUpperCase().replaceAll('-', '_')
         variables.language = formattedLanguage
       }
 
