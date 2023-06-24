@@ -1,5 +1,9 @@
 # 📅 query.js Changelog
 
+## 2.2.0 - 2023-06-24
+
+* Added `sessionStorage` cache
+
 ## 2.1.0 - 2023-05-09
 
 * Improved support for language codes with two parts

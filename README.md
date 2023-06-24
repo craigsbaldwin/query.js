@@ -38,3 +38,9 @@ The response you receive will be an object with all the usual edges and nodes yo
 It's recommended that you use Liquid to define the `locale` and `country` values using `{{ localization.language.iso_code | json }}` and `{{ localization.country.iso_code | json }}` respectively and pass them to JS.
 
 > You should never use this to access the Admin API as your credentials will be publicly accessible.
+
+### Cache
+
+The latest version uses `sessionStorage` to cache the storefront API response. This allows query.js to instantly retrieve an API response if the same query is made in the same session.
+
+This behaviour can be disabled by passing `false` to the `useCache` function argument on a use-by-use basis, or by changing `true` to `false` to disable it completely.
