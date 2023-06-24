@@ -8,13 +8,19 @@
  */
 
 /**
+ * Set global variables.
+ */
+const queryCacheKey = 'query-cache'
+
+/**
  * Query storefront API.
  * @param {Object} data - Parameters.
  * @param {Object} data.query - GraphQL query.
  * @param {Object} data.variables - GraphQL variables.
+ * @param {Boolean} useCache - Use sessionStorage cache.
  * @returns {Promise}
  */
-export default ({ query: graphqlQuery, variables }) => {
+export default ({ query: graphqlQuery, variables }, useCache = true) => {
   return new Promise(async(resolve, reject) => {
     try {
       const store = 'store_name'
@@ -45,6 +51,21 @@ export default ({ query: graphqlQuery, variables }) => {
       }
 
       /**
+       * Build storage key and check if query has been cached.
+       */
+      const storageKey = buildStorageKey(graphqlQuery, variables)
+      const queryCache = JSON.parse(sessionStorage.getItem(queryCacheKey))
+
+      if (
+        useCache &&
+        queryCache &&
+        queryCache[storageKey]
+      ) {
+        resolve(queryCache[storageKey])
+        return
+      }
+
+      /**
        * Fetch response.
        */
       let response = await fetch(url, {
@@ -62,6 +83,13 @@ export default ({ query: graphqlQuery, variables }) => {
       }
 
       response = await response.json()
+
+      if (useCache) {
+        const data = JSON.parse(sessionStorage.getItem(queryCacheKey)) || {}
+        data[storageKey] = response.data
+        sessionStorage.setItem(queryCacheKey, JSON.stringify(data))
+      }
+
       resolve(response.data)
 
     } catch (error) {
@@ -72,7 +100,7 @@ export default ({ query: graphqlQuery, variables }) => {
 
 /**
  * Build GraphQL query string from AST format data.
- * @param {Object} query - AST format GraphQL query.
+ * @param {Object} astData - AST format GraphQL query.
  * @returns {String}
  */
 function buildQuery(astData) {
@@ -198,4 +226,27 @@ function buildListArgumentValue(argument) {
   })
 
   return `[${values.join(', ')}]`
+}
+
+/**
+ * Build storage key for sessionStorage caching.
+ * @param {Object} astData - AST format GraphQL query.
+ * @param {Object} variables - GraphQL variables.
+ * @returns {String}
+ */
+function buildStorageKey(astData, variables = {}) {
+  const queryString = astData.definitions
+    .map((definition) => {
+      const type = definition.operation || 'fragment'
+      return `${type}:"${definition.name.value}"`
+    })
+    .join('-')
+
+  const variableString = Object.entries(variables)
+    .map(([key, value]) => {
+      return `${key}:${JSON.stringify(value)}`
+    })
+    .join('-')
+
+  return `${queryString}-length:${astData.loc.end}-${variableString}`
 }
